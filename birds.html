@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js canvas - geometry - birds</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #808080;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				background-color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				padding: 5px;
+			}
+		</style>
+		<script src="./lib/leapjs/leap.js"></script>
+	</head>
+	<body>
+		<div id="container"></div>
+		<script src="./lib/threejs/libs/three.min.js"></script>
+		<script src="./js/Bird.js"></script>
+		<script src="./js/Pointer.js"></script>
+		<script src="./lib/threejs/libs/stats.min.js"></script>
+		<script src="./lib/threejs/libs/tween.min.js"></script>
+
+		<script>
+    
+      function moveFinger(Finger, posX, posY, posZ, dirX, dirY, dirZ) {
+        //Finger.style.webkitTransform = "translateX("+posX+"px) translateY("+posY+"px) translateZ("+posZ+"px) rotateX("+dirX+"deg) rotateY(0deg) rotateZ("+dirZ+"deg)";
+      }
+      function moveSphere(Sphere, posX, posY, posZ, rotX, rotY, rotZ) {
+        //Sphere.style.webkitTransform = "translateX("+posX+"px) translateY("+posY+"px) translateZ("+posZ+"px) rotateX("+rotX+"deg) rotateY(0deg) rotateZ(0deg)";
+      }
+      var fingers = {};
+      var spheres = {};
+      Leap.loop(function(frame) {
+        var fingerIds = {};
+        var handIds = {};
+        if (frame.hands === undefined ) { 
+          var handsLength = 0 
+        } else {
+          var handsLength = frame.hands.length;
+        }
+        for (var handId = 0, handCount = handsLength; handId != handCount; handId++) {
+          var hand = frame.hands[handId];
+          var posX = (hand.palmPosition.x*3);
+          var posY = (hand.palmPosition.z*3)-200;
+          var posZ = (hand.palmPosition.y*3)-400;
+          var sphere = spheres[hand.id];
+         
+        }
+       
+        for (var pointableId = 0, pointableCount = frame.pointables.length; pointableId != pointableCount; pointableId++) {
+          var pointable = frame.pointables[pointableId];
+          var posX = (pointable.tipPosition[0]*3);
+          var posY = (pointable.tipPosition[1]*3);
+          var posZ = (pointable.tipPosition[2]*3);
+          var dirX = -(pointable.direction[1]*90);
+          var dirY = -(pointable.direction[2]*90);
+          var dirZ = (pointable.direction[0]*90);
+          var finger = fingers[pointable.id];
+          if (!finger) {
+          	finger = fingers[pointable.id] = pointable;
+          	finger.mesh = new THREE.Mesh( new THREE.SphereGeometry(10,20,20), new THREE.MeshBasicMaterial( { color:Math.random() * 0xffffff, side: THREE.DoubleSide } ) );
+			if(scene)
+				scene.add( finger.mesh );
+          }
+          finger.mesh.position.x = posX/2;
+          finger.mesh.position.y = posY/3-250;
+          finger.mesh.position.z = posZ/2+400;
+
+          attractBirdsToObject(finger.mesh.position);
+          
+          fingerIds[pointable.id] = true;
+        }
+        for (id in fingers) {
+           if (!fingerIds[id]) {
+             if(scene)
+             	scene.remove(fingers[id].mesh);
+             delete fingers[id];
+           }
+         }
+       
+      });
+    </script>
+		<script>
+			var SCREEN_WIDTH = window.innerWidth,
+			SCREEN_HEIGHT = window.innerHeight,
+			SCREEN_WIDTH_HALF = SCREEN_WIDTH  / 2,
+			SCREEN_HEIGHT_HALF = SCREEN_HEIGHT / 2;
+			var camera, scene, renderer,
+			birds, bird, sprite;
+			var boid, boids;
+			var stats;
+			var size=100;
+			init();
+			animate();
+			function init() {
+				camera = new THREE.PerspectiveCamera( 75, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 10000 );
+				camera.position.z = 900;
+				scene = new THREE.Scene();
+				birds = [];
+				boids = [];
+
+				var material = new THREE.SpriteMaterial( {
+					map: THREE.ImageUtils.loadTexture( "textures/lensflare2.jpg" ),
+					useScreenCoordinates: false
+				} );
+				material.transparent = true;
+				material.blending = THREE[ "SubtractiveBlending" ];
+				
+				for ( var i = 0; i < 200; i ++ ) {
+					boid = boids[ i ] = new Boid();
+					boid.position.x = Math.random() * 400 - 200;
+					boid.position.y=  Math.random() * 400 - 200;
+					boid.position.z = Math.random() * 400 - 200;
+					boid.velocity.x = Math.random() * 2 - 1;
+					boid.velocity.y = Math.random() * 2 - 1;
+					boid.velocity.z = Math.random() * 2 - 1;
+					boid.setAvoidWalls( true );
+					boid.setWorldSize( 1000, 1000, 800 );
+					sprite = birds[ i ] = new THREE.Sprite( material.clone() );
+					getRandomColor(sprite.material.color);
+					//initParticle( sprite, i * 100 );
+					sprite.phase = Math.floor( Math.random() * 62.83 );
+					sprite.scale.set(size,size,size);
+					sprite.position = boid.position;//.set(boid.position.x, boid.position.y, boid.position.z);
+					scene.add( sprite );
+				}
+
+				renderer = new THREE.WebGLRenderer( {alpha:false} );
+				renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+				renderer.setClearColor( 0xffffff );
+				//document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.body.appendChild( renderer.domElement );
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.left = '0px';
+				stats.domElement.style.top = '0px';
+				document.getElementById( 'container' ).appendChild(stats.domElement);
+				//
+				window.addEventListener( 'resize', onWindowResize, false );
+			}
+			function getRandomColor(color)
+			{
+				var index = Math.floor(Math.random()*3.0);
+				var c = [0,0,0];
+				for(var i=0;i<3;i++)
+					c[i] = index == i ? 1 : 0;
+				color.r = c[0];
+				color.g = c[1];
+				color.b = c[2];
+			}
+			function generateSprite() {
+
+				var canvas = document.createElement( 'canvas' )
+;				canvas.width = 16;
+				canvas.height = 16;
+
+				var context = canvas.getContext( '2d' );
+				var gradient = context.createRadialGradient( canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2 );
+				gradient.addColorStop( 1, 'rgba(0,0,0,0)' );
+				//gradient.addColorStop( 0.2, 'rgba(0,255,255,1)' );
+				//gradient.addColorStop( 0.4, 'rgba(0,0,64,1)' );
+				gradient.addColorStop( 0, 'rgba(0,0,0,1)' );
+
+				context.fillStyle = gradient;
+				context.fillRect( 0, 0, canvas.width, canvas.height );
+
+				return canvas;
+			}
+
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			function attractBirdsToObject( point ) {
+				//var vector = new THREE.Vector3( event.clientX - SCREEN_WIDTH_HALF, - event.clientY + SCREEN_HEIGHT_HALF, 0 );
+				for ( var i = 0, il = boids.length; i < il; i++ ) {
+					boid = boids[ i ];
+					//point.z = - point.z;
+					//boid.position.z
+					//boid.repulse( vector );
+					 boid.attract( point );
+				}
+			}
+			//
+			function animate() {
+				requestAnimationFrame( animate );
+				render();
+				stats.update();
+			}
+			function render() {
+				for ( var i = 0, il = birds.length; i < il; i++ ) {
+					boid = boids[ i ];
+					boid.run( boids );
+					bird = birds[ i ];
+					color = bird.material.color;
+					color.a = ( boid.velocity.length() / Boid._maxSpeed );
+					bird.rotation.y = Math.atan2( - boid.velocity.z, boid.velocity.x );
+					bird.rotation.z = Math.asin( boid.velocity.y / boid.velocity.length() );
+					bird.phase = ( bird.phase + ( Math.max( 0, bird.rotation.z ) + 0.1 )  ) % 62.83;
+					//bird.geometry.vertices[ 5 ].y = bird.geometry.vertices[ 4 ].y = Math.sin( bird.phase ) * 5;
+				}
+
+				//TWEEN.update();
+
+				renderer.render( scene, camera );
+			}
+		</script>
+		<div id="showHands">show hands</div>
+		<div id="hideHands">hide hands</div>
+	</body>
+</html>
